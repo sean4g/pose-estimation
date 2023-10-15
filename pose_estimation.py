@@ -8,7 +8,7 @@ import numpy as np
 # to edit excel
 import pandas as pd
 
-BASIS = [(718.75, 399.34), (707.88, 445.79)]
+# BASIS = [(718.75, 399.34), (707.88, 445.79)]
 
 '''
     NOSE:           int = 0
@@ -30,58 +30,55 @@ BASIS = [(718.75, 399.34), (707.88, 445.79)]
     RIGHT_ANKLE:    int = 16
 '''
 
+df = pd.DataFrame({'Frame': [], 'Nose': [], 'Left Eye': [], 'Right Eye': [], 'Left Ear': [], 'Right Ear': [],
+                   'Left Shoulder': [], 'Right Shoulder': [], 'Left Elbow': [], 'Right Elbow': [],
+                   'Left Wrist': [], 'Right Wrist': [], 'Left Hip': [], 'Right Hip': [], 
+                   'Left Knee': [], 'Right Knee': [], 'Left Ankle': [], 'Right Ankle': []})
+
 def get_keypoints(results):
-    li = []
     if len(results[0].boxes.conf) > 1:
-        li.append(results[0].keypoints.xy[1][9].tolist())
-        li.append(results[0].keypoints.xy[1][10].tolist())
-        li.append(results[0].keypoints.xy[1][2].tolist())
-        li.append(results[0].keypoints.xy[1][4].tolist())
-        li.append(results[0].keypoints.xy[1][6].tolist())
-    else:
-        li.append(results[0].keypoints.xy[0][9].tolist())
-        li.append(results[0].keypoints.xy[0][10].tolist())
-        li.append(results[0].keypoints.xy[0][2].tolist())
-        li.append(results[0].keypoints.xy[0][4].tolist())
-        li.append(results[0].keypoints.xy[0][6].tolist())
-    return li
+        return results[0].keypoints.xy[1].tolist()
+
+    return results[0].keypoints.xy[0].tolist()
 
 # initialize apriltag detector
 detector = Detector(families="tag16h5", debug=1)
 
 model = YOLO("YOLOv8n-pose.pt")
-source = "pose_video.mp4"
-# results = model.predict(source, save=False, imgsz=320, conf=0.65, boxes=False)
+source = "20230529114514VCAP1_crop_trim.mp4"
+# results = model.predict(source, save=True, imgsz=320, conf=0.5, boxes=True)
 cap = cv2.VideoCapture(source)
 
-#initialize graph
-# plt.ion()
-# fig, ax = plt.subplots(figsize =(16, 9))
-# tags = np.array(['left', 'right', 'distance'])
-# y = np.array([750, 750, 1])
-# graph = ax.bar(tags, y)
-# plt.show(block=False)
+'''#initialize graph
+plt.ion()
+fig, ax = plt.subplots(figsize =(16, 9))
+tags = np.array(['left', 'right', 'distance'])
+y = np.array([750, 750, 1])
+graph = ax.bar(tags, y)
+plt.show(block=False)'''
 
 # data editor
-df = pd.DataFrame({'Frame': [], 'Left Wrist': [], 'Right Wrist': [], 'Right Eye': [], 'Right Ear': [],  'Right Shoulder': []})
 frame_num = 0
+
+keypoints=None
+
 while cap.isOpened():
     success, frame = cap.read()
     if success:
         frame_num += 1
         # get results
-        results = model.predict(frame, save=False, imgsz=320, conf=0.65, boxes=False)
+        results = model.predict(frame, save=False, imgsz=320, conf=0.5, boxes=False)
 
         # convert to gray for apriltags
-        # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        '''# gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         # apriltag_det = detector.detect(gray)
-        # print(apriltag_det)
+        # print(apriltag_det)'''
 
         # get left/right wrist points
         annotated_frame = results[0].plot()
 
         #if person found
-        new_row = [frame_num, 'N/A', 'N/A', 'N/A', 'N/A', 'N/A']
+        new_row = [frame_num] + ['N/A'] * 17
         
         if results[0].keypoints.has_visible:
             keypoints = get_keypoints(results)
@@ -91,11 +88,11 @@ while cap.isOpened():
 
         # cv2.imshow("Test", annotated_frame)
 
-        # Show Plot
+        '''# Show Plot
         # for rect, h in zip(graph,show):
         #     rect.set_height(h)
         # fig.canvas.draw()
-        # fig.canvas.flush_events()
+        # fig.canvas.flush_events()'''
 
         df.loc[len(df.index)] = new_row    
 
@@ -103,8 +100,25 @@ while cap.isOpened():
             break
     else:
         break
+    
+if keypoints:
+    BASIS = keypoints[10]
 
-print(df.size)
+distances = []
+frames = []
+
+for row in df.itertuples(index=False):
+    if row[11] != 'N/A':
+        distance = BASIS[0] - row[11][0]
+        frames.append(row[0])
+        distances.append(distance if distance >= 0 else 0)
+
+
+
+plt.plot(frames, distances)
+plt.show()
+
+
 df.to_csv(f'out_{source[:-4]}.csv', index=False)
 
 # cap.release()
